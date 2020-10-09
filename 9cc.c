@@ -20,6 +20,7 @@ struct Token {
 	char *str;
 };
 
+char *user_input;
 Token *token;
 
 void error(char *fmt, ...){
@@ -30,6 +31,20 @@ void error(char *fmt, ...){
 	exit(1);
 }
 
+void error_at(char *loc, char *fmt, ...){
+	va_list ap;
+	va_start(ap, fmt);
+
+	int pos = loc - user_input;
+	fprintf(stderr, "%s\n", user_input);
+	fprintf(stderr, "%*s", pos, "");
+	fprintf(stderr, "^ ");
+	vfprintf(stderr, fmt, ap);
+	fprintf(stderr, "\n");
+	exit(1);
+}
+
+
 bool consume(char op){
 	if(token->kind != TK_RESERVED || token->str[0] != op)
 		return false;
@@ -39,13 +54,13 @@ bool consume(char op){
 
 void expect(char op){
 	if(token->kind != TK_RESERVED || token->str[0] != op)
-		error("not '%c'", op);
+		error_at(token->str, "expected '%c'", op);
 	token=token->next;
 }
 
 int expect_number(){
 	if(token->kind != TK_NUM)
-		error("is not a number");
+		error_at(token->str, "expected a number");
 	int val=token->val;
 	token = token->next;
 	return val;
@@ -63,7 +78,8 @@ Token *new_token(TokenKind kind, Token *cur, char *str){
 	return tok;
 }
 
-Token *tokenize(char *p){
+Token *tokenize(){
+	char *p = user_input;
 	Token head;
 	head.next = NULL;
 	Token *cur = &head;
@@ -81,39 +97,24 @@ Token *tokenize(char *p){
 			cur->val = strtol(p,&p,10);
 			continue;
 		}
-		error("cannot tokenize.");
+		error_at(p, "expected a number.");
 	}
 	new_token(TK_EOF, cur, p);
 	return head.next;
 }
 
-//step4
-char *user_input;
-
-void error_at(char *loc, char *fmt, ...){
-	va_list ap;
-	va_start(ap, fmt);
-
-	int pos = loc - user_input;
-	fprintf(stderr, "%s\n", user_input);
-	fprintf(stderr, "%*s", pos, "");
-	fprintf(stderr, "^ ");
-	vfprintf(stderr, fmt, ap);
-	fprintf(stderr, "\n");
-	exit(1);
-}
-
-//step4 end
 int main(int argc, char **argv){
 	if(argc != 2){
 		error("not match the number of arguments");
 		return 1;
 	}
-	token=tokenize(argv[1]);
+
+	user_input = argv[1];
+	token = tokenize();
+
 	printf(".intel_syntax noprefix\n");
 	printf(".global main\n");
 	printf("main:\n");
-
 	printf("   mov rax, %d\n", expect_number());
 
 	while(!at_eof()){
